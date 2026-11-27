@@ -35,7 +35,7 @@ const staffRoster=[
   {name:'아나',origin:'필리핀'}
 ];
 const staff={...staffSpawn,profile:-1,angle:0,step:0,station:null,at:null,idle:2};
-let nextCrossingTone=0;
+let crossingBuffer, crossingAudio;
 const guestRoutes=[
   {inside:true,points:[[349,128],[239,130],[320,138]],clip:'guestTea',jp:'温かいお茶にしようかな。',ko:'따뜻한 차로 할까?'},
   {inside:true,points:[[372,365],[315,369],[306,314]],clip:'guestRice',jp:'おにぎり、どれにする？',ko:'주먹밥은 어떤 걸로 할래?'},
@@ -126,6 +126,7 @@ function initAudio(){
     voices=Object.fromEntries(Object.entries(window.staffVoiceData||{}).map(([id,data])=>[
       id,audio.decodeAudioData(Uint8Array.from(atob(data),c=>c.charCodeAt(0)).buffer).catch(()=>null)
     ]));
+    voices.crossingClip?.then(buffer=>{crossingBuffer=buffer;});
   }
   audio.resume().catch(()=>{});
 }
@@ -558,6 +559,7 @@ el('replay').onclick=resetVisit;
 
 function resetVisit(){
   closeDialog();
+  stopCrossingAudio();
   clearTimeout(microwave.timer);
   clearTimeout(captionTimer);
   music?.stop();
@@ -849,22 +851,34 @@ function drawMap(){
   map.beginPath();map.moveTo(0,-5);map.lineTo(3.5,4);map.lineTo(0,2);map.lineTo(-3.5,4);map.closePath();map.fill();
   map.restore();
 }
+function stopCrossingAudio(){
+  if(!crossingAudio)return;
+  crossingAudio.source.stop();
+  crossingAudio=null;
+}
 function updateCrossing(time){
   const green=time%14000<7200;
   const dx=crossing.x-player.x,dy=crossing.y-player.y;
   const distance=Math.hypot(dx,dy);
-  if(!green||!started||inside||!audio||muted||distance>170||time<nextCrossingTone)return green;
-  nextCrossingTone=time+1050;
-  const gain=audio.createGain();
-  gain.gain.value=.40*(1-distance/190);
-  const pan=audio.createStereoPanner?.();
-  if(pan){
-    pan.pan.value=Math.max(-.85,Math.min(.85,(dx*Math.cos(player.angle)+dy*Math.sin(player.angle))/125));
-    gain.connect(pan).connect(master);
-  }else gain.connect(master);
-  const now=audio.currentTime;
-  tone(1530,now,.12,.16,'sine',gain);
-  tone(1100,now+.16,.18,.15,'sine',gain);
+  if(!green||!started||inside||muted||distance>=170||!crossingBuffer){
+    stopCrossingAudio();
+    return green;
+  }
+  if(!crossingAudio){
+    const source=audio.createBufferSource();
+    const gain=audio.createGain();
+    const pan=audio.createStereoPanner?.();
+    source.buffer=crossingBuffer;
+    source.loop=true;
+    source.connect(gain);
+    if(pan)gain.connect(pan).connect(master);
+    else gain.connect(master);
+    crossingAudio={source,gain,pan};
+    source.start();
+  }
+  const {gain,pan}=crossingAudio;
+  gain.gain.value=.48*(1-distance/170);
+  if(pan)pan.pan.value=Math.max(-.85,Math.min(.85,(dx*Math.cos(player.angle)+dy*Math.sin(player.angle))/125));
   return green;
 }
 let previous=0;
