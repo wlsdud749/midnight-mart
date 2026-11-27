@@ -3,16 +3,7 @@
 const el = id => document.getElementById(id);
 const scene = el('scene');
 const yen = n => '¥' + n.toLocaleString('ja-JP');
-const products = [
-  ['연어 주먹밥','鮭おむすび',180,'rice','#f38c66'],
-  ['참치마요 주먹밥','ツナマヨおむすび',160,'rice','#63cdc9'],
-  ['가라아게 도시락','唐揚げ弁当',580,'bento','#e99b54'],
-  ['녹차','緑茶',130,'bottle','#9cbd52'],
-  ['카페라테','カフェラテ',190,'cup','#d8ad86'],
-  ['커스터드 푸딩','カスタードプリン',230,'pudding','#ffca6c'],
-  ['슈크림','シュークリーム',200,'bun','#edb36e'],
-  ['프라이드치킨','フライドチキン',250,'chicken','#f3a448']
-];
+const products = window.martProducts;
 const stations = [
   {id:'drinks',name:'음료 냉장고',jp:'ドリンク',label:'DRINKS',x:72,y:43,w:271,h:60,ids:[3,4],side:'bottom'},
   {id:'dessert',name:'디저트 매대',jp:'デザート',label:'SWEETS',x:76,y:169,w:133,h:56,ids:[5,6],side:'both'},
@@ -69,29 +60,6 @@ if(!renderScene){
   el('objective').textContent='WebGL을 지원하는 브라우저에서 플레이할 수 있어요';
 }
 
-function rect(x,y,w,h,color,g){
-  g.fillStyle=color;
-  g.fillRect(Math.round(x),Math.round(y),w,h);
-}
-function art(g,x,y,id){
-  const [, , ,type,c]=products[id];
-  const r=(a,b,w,h,col)=>rect(x+a,y+b,w,h,col,g);
-  if(type==='rice'){
-    r(6,2,4,2,'#fff6dc');r(5,4,6,2,'#fff6dc');r(4,6,8,2,'#fff6dc');r(2,8,12,5,'#fff6dc');r(5,8,6,6,'#294b43');r(6,6,4,2,c);
-  }else if(type==='bento'){
-    r(1,4,14,10,'#422e36');r(2,5,12,7,'#d38a58');r(3,6,5,5,'#fff4d5');r(9,6,4,2,'#b65e38');r(9,9,4,2,'#7d9c59');
-  }else if(type==='bottle'){
-    r(6,1,4,2,'#e7e8a6');r(5,3,6,2,c);r(4,5,8,9,'#567c45');r(4,6,8,5,c);r(5,7,2,3,'#eaf2b4');
-  }else if(type==='cup'){
-    r(3,3,10,2,'#f7efdc');r(4,5,8,7,c);r(5,12,6,2,'#f6dfc5');r(5,7,6,3,'#f8ebd7');
-  }else if(type==='pudding'){
-    r(5,4,6,2,'#a95f3d');r(4,6,8,2,'#d48547');r(3,8,10,4,c);r(2,12,12,2,'#fff0b5');
-  }else if(type==='bun'){
-    r(4,4,8,2,'#ffe0a0');r(2,6,12,6,c);r(3,12,10,2,'#b87a49');r(3,9,10,2,'#fff1c9');r(5,6,2,1,'#fff4c3');
-  }else{
-    r(5,2,6,2,'#ffce77');r(3,4,10,6,c);r(5,10,6,2,'#be6935');r(9,11,2,3,'#f5d9ad');r(11,13,2,2,'#f5d9ad');r(4,5,2,2,'#ffe29a');
-  }
-}
 let audio, master, music, voices, localBgm;
 let entrySample=Promise.resolve(null);
 if(location.protocol==='file:'){
@@ -278,7 +246,7 @@ function closeDialog(){
 const staffLines={
   coming:['ただいま伺います。','지금 갈게요.'],
   greeting:['ご注文ですか？','무엇을 도와드릴까요?'],
-  recommend:['夜食なら、鮭おむすびと温かいチキンがおすすめです。','야식으로 연어 주먹밥과 따뜻한 치킨을 추천해요.'],
+  recommend:['夜食なら、紅しゃけのおむすびと温かいファミチキがおすすめです。','야식으로 홍연어 주먹밥과 따뜻한 파미치키를 추천해요.'],
   order:['かしこまりました！','네, 알겠습니다!'],
   register:['お会計ですね。','계산 도와드릴게요.'],
   bag:['レジ袋はご利用ですか？','봉투 드릴까요?'],
@@ -306,7 +274,7 @@ function openDialog(id){
 }
 function row(id,adjust=true){
   const [ko,jp,price]=products[id];
-  return '<div class="row"><canvas class="product" width="16" height="16" data-product="'+id+'" aria-hidden="true"></canvas><div class="item"><strong>'+ko+'</strong><small>'+jp+'</small></div><span class="price">'+yen(price)+'</span>'+
+  return '<div class="row"><canvas class="product" width="128" height="128" data-product="'+id+'" aria-hidden="true"></canvas><div class="item"><strong>'+ko+'</strong><small>'+jp+'</small></div><span class="price">'+yen(price)+'</span>'+
     (adjust?'<div class="step"><button data-remove="'+id+'" aria-label="'+ko+' 빼기" '+(cart[id]?'':'disabled')+'>−</button><output>'+cart[id]+'</output>'+(modal==='cart'||modal==='register'?'':'<button data-add="'+id+'" aria-label="'+ko+' '+(id===7?'주문':'담기')+'">+</button>')+'</div>':'')+'</div>';
 }
 function coldBento(){
@@ -337,7 +305,7 @@ function foodView(){
     const [name]=products[id];
     const drink=products[id][3]==='bottle'||products[id][3]==='cup';
     const warm=id===bentoId&&warmBento?' · 따뜻한 도시락 '+warmBento+'개':'';
-    return ['<div class="food-row"><canvas class="product" width="16" height="16" data-product="'+id+'" aria-hidden="true"></canvas>'+
+    return ['<div class="food-row"><canvas class="product" width="128" height="128" data-product="'+id+'" aria-hidden="true"></canvas>'+
       '<div><strong>'+name+'</strong><small>'+amount+'개'+warm+'</small></div>'+
       '<button data-eat="'+id+'" aria-label="'+name+' '+(drink?'마시기':'먹기')+'">'+(drink?'마시기':'먹기')+'</button></div>'];
   });
@@ -434,11 +402,11 @@ function renderDialog(announcement=''){
   if(modal==='staff'){
     body.innerHTML=staffLine(announcement||'greeting')+'<div class="staff-options">'+
       '<button data-staff="recommend">야식 추천해 주세요</button>'+
-      '<button data-staff="hot">따뜻한 프라이드치킨 주세요</button>'+
+      '<button data-staff="hot">따뜻한 파미치키 주세요</button>'+
       '<button class="primary" data-staff="register">계산할게요</button></div>';
   }else if(station?.ids||modal==='cart'){
     const list=station?.ids||ids;
-    body.innerHTML=(modal==='hot'?(announcement?staffLine(announcement):'<p>＋ 버튼으로 프라이드치킨을 주문할 수 있어요.</p>'):'')+
+    body.innerHTML=(modal==='hot'?(announcement?staffLine(announcement):'<p>＋ 버튼으로 파미치키를 주문할 수 있어요.</p>'):'')+
       (list.length?list.map(id=>row(id)).join(''):'<p>장바구니가 비어 있어요.</p>')+
       '<div class="panel-foot"><span>장바구니 합계</span><strong class="price">'+yen(total())+'</strong></div>'+
       (total()>wallet?'<p class="warning">지갑에서 '+yen(total()-wallet)+' 부족해요.</p>':'');
@@ -473,7 +441,7 @@ function renderDialog(announcement=''){
   }else if(modal==='microwave'){
     body.innerHTML=microwaveView();
   }
-  body.querySelectorAll('[data-product]').forEach(c=>art(c.getContext('2d'),0,0,Number(c.dataset.product)));
+  body.querySelectorAll('[data-product]').forEach(c=>window.drawProductArt(c.getContext('2d'),Number(c.dataset.product)));
   if(control)body.querySelector(control)?.focus({preventScroll:true});
 }
 function startMicrowave(){

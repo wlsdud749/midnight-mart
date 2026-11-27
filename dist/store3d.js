@@ -57,7 +57,9 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
           base = mix(vec3(1.0,.9,.67),vec3(1.0,.53,.19),warm);
           base *= .85 + .15 * smoothstep(.10,.85,tint.r);
         } else if(tex.x >= 0.0) {
-          base *= texture2D(signs, tex).rgb;
+          vec4 surface = texture2D(signs, tex);
+          if(surface.a < .56) discard;
+          base *= surface.rgb;
         } else if(interiorLight > 0.5) {
           vec2 fixtureDistance = abs(mod(world.xz - vec2(118.0,83.0) + vec2(66.0,49.0), vec2(132.0,98.0)) - vec2(66.0,49.0));
           float pool = exp(-dot(fixtureDistance * vec2(0.020,0.035), fixtureDistance * vec2(0.020,0.035)));
@@ -92,10 +94,16 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
   const attributes = ['point','color','uv'].map(name => gl.getAttribLocation(program,name));
 
   const atlas = document.createElement('canvas');
-  atlas.width = 512;
+  atlas.width = 1024;
   atlas.height = 512;
   const ink = atlas.getContext('2d');
   const signs = new Map();
+  function region(id,x,y,w,h){
+    signs.set(id, [
+      [(x+.5)/atlas.width,(y+h-.5)/atlas.height],[(x+w-.5)/atlas.width,(y+h-.5)/atlas.height],
+      [(x+w-.5)/atlas.width,(y+.5)/atlas.height],[(x+.5)/atlas.width,(y+.5)/atlas.height]
+    ]);
+  }
   function sign(id, text, bg, fg, width = 128, height = 32){
     const slot = signs.size;
     const x = (slot % 2) * 256;
@@ -107,10 +115,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     ink.textAlign='center';
     ink.textBaseline='middle';
     ink.fillText(text, x + width / 2, y + height / 2, width - 12);
-    signs.set(id, [
-      [(x+.5)/512,(y+height-.5)/512],[(x+width-.5)/512,(y+height-.5)/512],
-      [(x+width-.5)/512,(y+.5)/512],[(x+.5)/512,(y+.5)/512]
-    ]);
+    region(id,x,y,width,height);
   }
   sign('brand','FamilyMart','#eef6ef','#17577c',256,52);
   sign('hours','24 HOURS','#174a50','#a0f8ca',128);
@@ -123,6 +128,14 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
   sign('ana','ANA','#edf4ec','#203f38',128);
   const signColors = {drinks:'#245373',dessert:'#764859',meals:'#2a6d59',hot:'#9b5936',register:'#2c5369',microwave:'#384551'};
   for(const station of stations)sign(station.id, station.label, signColors[station.id], '#fff7e8');
+  for(let id=0;id<products.length;id++){
+    const x=512+(id%4)*128,y=Math.floor(id/4)*128;
+    ink.save();
+    ink.translate(x,y);
+    window.drawProductArt(ink,id);
+    ink.restore();
+    region('product-'+id,x,y,128,128);
+  }
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,atlas);
@@ -178,23 +191,22 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
   function packagedProduct(x,z,y,id){
     const [, , ,type,color]=products[id];
     if(type==='bottle'||type==='cup'){
-      rounded(x+4,y+6,z+4,3.5,6,3.2,color,8);
-      box(x+2,z+2.5,4,3,y+11,2,'#f1efdf');
-      box(x+1.6,z+6.4,4.8,.45,y+3.5,4,'#ece8cd');
+      rounded(x+5,y+6,z+4,type==='bottle'?2.3:3.25,5.5,3,color,8);
     }else if(type==='rice'){
-      quad([x,y,z+8],[x+10,y,z+8],[x+7,y+8,z+8],[x+3,y+8,z+8],'#f7efe2');
-      quad([x+3,y+8,z+8],[x+7,y+8,z+8],[x+7,y+8,z+1],[x+3,y+8,z+1],'#faf7ee');
-      quad([x,y,z+8],[x+3,y+8,z+8],[x+3,y+8,z+1],[x,y,z+1],'#d9e1d2');
-      quad([x+7,y+8,z+8],[x+10,y,z+8],[x+10,y,z+1],[x+7,y+8,z+1],'#ebe9da');
-      box(x+2,z+7.8,6,.5,y+.1,3,color);
+      quad([x+1,y+1,z+7],[x+9,y+1,z+7],[x+6,y+9,z+7],[x+4,y+9,z+7],'#334033');
+      quad([x+1,y+1,z+7],[x+4,y+9,z+7],[x+4,y+9,z+2],[x+1,y+1,z+2],'#455044');
+      quad([x+6,y+9,z+7],[x+9,y+1,z+7],[x+9,y+1,z+2],[x+6,y+9,z+2],'#24342e');
     }else if(type==='bento'){
-      box(x,z,11,11,y,2.8,'#353e40');
-      box(x+.7,z+.7,9.6,9.6,y+2.8,1.3,color);
-      box(x+1,z+5,9,.9,y+4.1,.4,'#fff4d6');
+      box(x+1,z+2,10,7,y,1.8,'#353e40');
+      quad([x,y+1.82,z+11],[x+12,y+1.82,z+11],[x+12,y+1.82,z],[x,y+1.82,z],'#ffffff',1,'product-'+id);
+      return;
     }else{
-      rounded(x+5,y+2.2,z+4,4,2.6,3.5,color,8);
-      box(x,z,10,8,y,.8,'#eee1c4');
+      rounded(x+5,y+2.9,z+4,3.55,type==='pudding'?2.1:2.8,3.3,color,8);
     }
+    const tall=type==='bottle'||type==='cup'?14:type==='rice'?11:8;
+    const wide=type==='rice'?12:11;
+    front(x+5-wide/2,y-.65,z+8.1,wide,tall,'product-'+id);
+    back(x+5-wide/2,y-.65,z+.9,wide,tall,'product-'+id);
   }
   function fixture(s){
     const {x,y,w,h,id,ids}=s;

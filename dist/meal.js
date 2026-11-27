@@ -1,5 +1,15 @@
 'use strict';
 
+const motionPackshots=new Map();
+function motionPackshot(product){
+  if(!motionPackshots.has(product)){
+    const canvas=document.createElement('canvas');
+    canvas.width=canvas.height=128;
+    window.drawProductArt(canvas.getContext('2d'),window.martProducts.indexOf(product));
+    motionPackshots.set(product,canvas);
+  }
+  return motionPackshots.get(product);
+}
 window.drawMealMotion=function drawMealMotion(canvas,product,progress){
   const g=canvas.getContext('2d');
   const [,,,type,color]=product;
@@ -35,16 +45,8 @@ window.drawMealMotion=function drawMealMotion(canvas,product,progress){
   shape('#304459',()=>{
     g.moveTo(48,97);g.lineTo(66,84);g.lineTo(151,177);g.lineTo(83,198);g.closePath();
   });
-  if(drink){
-    const bottle=type==='bottle';
-    box(-19,-39,39,81,9,bottle?'#627c39':'#cf9f78');
-    box(-15,-29,4,63,2,'#ffffff4c');
-    box(-20,-12,41,29,4,bottle?'#f0ebc9':'#f5eee5');
-    box(-8,-45,16,9,3,bottle?'#deddb1':'#4a3429');
-    g.fillStyle=bottle?'#36532d':'#684934';
-    g.font='bold 8px sans-serif';
-    g.textAlign='center';
-    g.fillText(bottle?'緑茶':'LATTE',0,6);
+  if(drink||type==='chicken'){
+    g.drawImage(motionPackshot(product),-54,-48,108,108);
   }else if(type==='rice'){
     shape('#f7f0d8',()=>{
       g.moveTo(-28,23);g.quadraticCurveTo(-16,-9,-6,-24);g.quadraticCurveTo(0,-32,6,-24);
@@ -62,11 +64,10 @@ window.drawMealMotion=function drawMealMotion(canvas,product,progress){
     box(-6,-30,5,66,2,'#c7a57d');box(2,-30,5,66,2,'#e9c99f');
     g.restore();
   }else{
-    oval(0,1,28,23,type==='chicken'?'#9e4d27':color);
-    oval(-4,-4,22,16,type==='chicken'?'#d88a47':color);
+    oval(0,1,28,23,color);
+    oval(-4,-4,22,16,color);
     if(type==='bun')box(-23,4,46,5,3,'#fff2bd');
     if(type==='pudding')oval(0,-12,20,7,'#ab632f');
-    if(type==='chicken')box(12,14,14,18,6,'#f0d5a5');
   }
   oval(14,35,11,8,'#edb48b');
   g.restore();
