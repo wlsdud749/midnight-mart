@@ -5,7 +5,7 @@ const scene = el('scene');
 const yen = n => '¥' + n.toLocaleString('ja-JP');
 const products = window.martProducts;
 const stations = [
-  {id:'drinks',name:'음료 냉장고',jp:'冷蔵 · ドリンク',label:'冷蔵 DRINKS',x:72,y:43,w:271,h:60,ids:[3,4],side:'bottom',storage:'chilled'},
+  {id:'drinks',name:'음료·맥주 냉장고',jp:'冷蔵 · ドリンク・ビール',label:'冷蔵 DRINKS & BEER',x:72,y:43,w:271,h:60,ids:[3,4,8],side:'bottom',storage:'chilled'},
   {id:'dessert',name:'디저트 냉장고',jp:'冷蔵 · デザート',label:'冷蔵 SWEETS',x:76,y:169,w:133,h:56,ids:[5,6],side:'both',storage:'chilled'},
   {id:'meals',name:'도시락·주먹밥 냉장고',jp:'冷蔵 · お弁当・おむすび',label:'冷蔵 BENTO & ONIGIRI',x:92,y:292,w:190,h:59,ids:[0,1,2],side:'both',storage:'chilled'},
   {id:'hot',name:'핫스낵 온장고',jp:'ホットスナック',label:'保温 HOT SNACKS',x:398,y:161,w:86,h:59,ids:[7],side:'bottom',storage:'hot'},
@@ -16,8 +16,9 @@ const fixtures = [...stations,{x:402,y:43,w:180,h:46},{x:36,y:386,w:78,h:39}];
 const exit = {id:'exit',x:320,y:444};
 const sleeper={id:'sleeper',x:580,y:337,angle:1.48};
 const crossing={x:492,y:374};
+const bench={id:'bench',x:578,y:387,angle:.30};
 const spawn = {x:320,y:415,angle:0,pitch:.11,step:0};
-const player = {...spawn};
+const player = {...spawn,seated:false};
 const staffSpawn={x:567,y:114};
 const staffRoster=[
   {name:'민',origin:'베트남'},
@@ -54,7 +55,7 @@ let scanCount = 0, scanItems = [], scanTimer, captionTimer;
 let finished=false, timeOfDay='night';
 const microwave={heated:0,endsAt:0,timer:null,shownSeconds:null,ready:false};
 const bentoId=products.findIndex(item=>item[3]==='bento');
-const renderScene = window.createStoreView(scene,stations,products);
+const renderScene = window.createStoreView(scene,stations,products,bench);
 if(!renderScene){
   el('start').disabled=true;
   el('objective').textContent='WebGL을 지원하는 브라우저에서 플레이할 수 있어요';
@@ -303,7 +304,7 @@ function foodView(){
   const items=heldFood.flatMap((amount,id)=>{
     if(!amount)return [];
     const [name]=products[id];
-    const drink=products[id][3]==='bottle'||products[id][3]==='cup';
+    const drink=window.isMartDrink(products[id]);
     const warm=id===bentoId&&warmBento?' · 따뜻한 도시락 '+warmBento+'개':'';
     return ['<div class="food-row"><canvas class="product" width="128" height="128" data-product="'+id+'" aria-hidden="true"></canvas>'+
       '<div><strong>'+name+'</strong><small>'+amount+'개'+warm+'</small></div>'+
@@ -314,12 +315,12 @@ function foodView(){
 }
 function eat(id){
   if(!heldFood[id]||mealMotion)return;
-  const [name,,,type]=products[id];
-  const drink=type==='bottle'||type==='cup';
+  const [name]=products[id];
+  const drink=window.isMartDrink(products[id]);
   const warm=id===bentoId&&warmBento>0;
   heldFood[id]--;
   if(warm)warmBento--;
-  foodResult=(warm?'따뜻한 ':'')+name+(drink?' 한 잔을 마셨어요.':' 1개를 먹었어요.');
+  foodResult=(warm?'따뜻한 ':'')+name+(drink?(products[id][3]==='can'?' 한 캔을 마셨어요.':' 한 잔을 마셨어요.'):' 1개를 먹었어요.');
   closeDialog();
   mealMotion={id,drink,startedAt:performance.now(),sound:false};
   el('meal-status').textContent=name+(drink?' 마시는 중…':' 먹는 중…');
@@ -580,7 +581,8 @@ function resetVisit(){
   resetGuests();
   Object.assign(staff,{...staffSpawn,angle:0,step:0,station:null,at:null,idle:2});
   Object.assign(microwave,{heated:0,endsAt:0,timer:null,shownSeconds:null,ready:false});
-  Object.assign(player,spawn);
+  Object.assign(player,spawn,{seated:false});
+  el('stand').hidden=true;
   hud();
   el('caption').hidden=true;
   el('minimap').hidden=true;
@@ -609,6 +611,23 @@ function enter(){
   startMusic();
   say('いらっしゃいませ！','어서 오세요!');
 }
+function toggleBench(){
+  if(inside||modal||mealMotion)return;
+  player.seated=!player.seated;
+  if(player.seated){
+    Object.assign(player,{x:bench.x+2,y:bench.y-3,angle:bench.angle,pitch:.29,step:0});
+    el('location').textContent='도쿄타워 전망 벤치';
+    el('objective').textContent=receipt?'구매한 음식 메뉴에서 벤치에 앉아 먹을 수 있어요':'벤치에 앉아 도쿄타워를 바라보고 있어요';
+  }else{
+    Object.assign(player,{x:bench.x+5,y:bench.y-15,pitch:.12});
+    el('location').textContent=timeOfDay==='day'?'도쿄의 낮 · 매장 앞':'도쿄의 밤 · 매장 앞';
+    el('objective').textContent=finished?'밖을 둘러보거나 다시 시작하세요':'자동문을 통과해 매장에 들어갈 수 있어요';
+  }
+  el('stand').hidden=!player.seated;
+  keys.clear();
+  touches.clear();
+}
+el('stand').onclick=toggleBench;
 function leave(){
   if(receipt?.printed===null||microwave.endsAt||microwave.ready){
     updateObjective();
@@ -632,17 +651,21 @@ function leave(){
 }
 function canWalk(x,y){
   if(!inside)return x>=35&&x<=605&&y<=480&&(y>=303||(!finished&&y>=280&&x>281&&x<359))&&
-    (timeOfDay==='day'||Math.hypot(x-sleeper.x,y-sleeper.y)>=15)&&Math.hypot(x-crossing.x,y-crossing.y)>=7;
+    (timeOfDay==='day'||Math.hypot(x-sleeper.x,y-sleeper.y)>=15)&&Math.hypot(x-crossing.x,y-crossing.y)>=7&&
+    (Math.abs(x-bench.x)>27||Math.abs(y-bench.y)>10);
   if(Math.hypot(x-staff.x,y-staff.y)<15)return false;
   return x>=35&&x<=605&&y>=42&&y<=450&&(y<=432||(x>286&&x<354))&&fixtures.every(r=>x+7<=r.x||x-7>=r.x+r.w||y+7<=r.y||y-7>=r.y+r.h);
 }
 function stationNear(){
   if(modal||mealMotion)return null;
   if(!inside){
-    if(timeOfDay==='day')return null;
-    const dx=sleeper.x-player.x, dy=sleeper.y-player.y;
-    const distance=Math.hypot(dx,dy);
-    return distance<57&&Math.sin(player.angle)*dx-Math.cos(player.angle)*dy>distance*.4?sleeper:null;
+    if(player.seated)return bench;
+    if(timeOfDay==='night'){
+      const dx=sleeper.x-player.x, dy=sleeper.y-player.y;
+      const distance=Math.hypot(dx,dy);
+      if(distance<57&&Math.sin(player.angle)*dx-Math.cos(player.angle)*dy>distance*.4)return sleeper;
+    }
+    return Math.hypot(player.x-bench.x,player.y-bench.y)<32?bench:null;
   }
   let best=null,score=Infinity;
   if(Math.abs(player.x-exit.x)<35&&player.y>394&&Math.cos(player.angle)<-.4)return exit;
@@ -707,6 +730,7 @@ function interact(){
   const station=stationNear();
   if(!station)return;
   if(staffStops[station.id])receipt?openCheckout():summon(station.id);
+  else if(station.id==='bench')toggleBench();
   else if(station.id==='exit')leave();
   else openDialog(station.id);
 }
@@ -884,7 +908,7 @@ function frame(time){
     const forward=Number(held.has('up'))-Number(held.has('down'));
     const turn=Number(held.has('turnRight'))-Number(held.has('turnLeft'));
     player.angle+=turn*dt*2.35;
-    if(side||forward){
+    if(!player.seated&&(side||forward)){
       const speed=135*dt/(side&&forward?Math.SQRT2:1);
       const dx=(Math.cos(player.angle)*side+Math.sin(player.angle)*forward)*speed;
       const dy=(Math.sin(player.angle)*side-Math.cos(player.angle)*forward)*speed;
@@ -910,16 +934,16 @@ function frame(time){
     }
   }
   if(inside)drawMap();
-  el('crosshair').hidden=!started||Boolean(modal);
+  el('crosshair').hidden=!started||Boolean(modal)||player.seated;
   nearby=started&&!mealMotion?stationNear():null;
   const prompt=el('prompt');
-  prompt.hidden=!nearby;
+  prompt.hidden=!nearby||player.seated;
   const action=el('action');
   action.disabled=Boolean(paymentMotion)||(!nearby&&!modal);
   const staffId=nearby?.id;
   const verb=staffStops[staffId]&&!receipt
     ?staff.station===staffId?staffRoster[staff.profile].name+' · 오는 중':staff.at===staffId?(staffId==='hot'?'주문하기':'직원과 대화'):'직원 호출'
-    :({register:'구매 내역',microwave:'전자레인지 사용',exit:'매장 나가기',sleeper:'살펴보기'})[staffId]||'둘러보기';
+    :({register:'구매 내역',microwave:'전자레인지 사용',exit:'매장 나가기',sleeper:'살펴보기',bench:player.seated?'벤치에서 일어나기':'벤치에 앉기'})[staffId]||'둘러보기';
   const actionText=modal?'닫기':nearby?verb:'상호작용';
   if(action.textContent!==actionText)action.textContent=actionText;
   if(nearby){

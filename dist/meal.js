@@ -13,7 +13,7 @@ function motionPackshot(product){
 window.drawMealMotion=function drawMealMotion(canvas,product,progress){
   const g=canvas.getContext('2d');
   const [,,,type,color]=product;
-  const drink=type==='bottle'||type==='cup';
+  const drink=window.isMartDrink(product);
   const lift=Math.min(1,progress/.34,(1-progress)/.27);
   const reach=lift*lift*(3-2*lift);
   const bite=progress>.44&&progress<.75?Math.sin((progress-.44)*39)*2.6:0;

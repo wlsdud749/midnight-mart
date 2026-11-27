@@ -8,8 +8,10 @@ window.martProducts=[
   ['무가당 카페라테 300ml','カフェラテ 砂糖不使用 300ml',190,'cup','#ab8767'],
   ['가마에서 구운 사르르 푸딩','窯出しとろけるプリン',230,'pudding','#e4bc71'],
   ['진한 바닐라 커스터드 슈','バニラたっぷり！濃厚カスタードシュー',200,'bun','#cb883a'],
-  ['파미치키','ファミチキ',250,'chicken','#d68b45']
+  ['파미치키','ファミチキ',250,'chicken','#d68b45'],
+  ['삿포로 비어 서프라이즈 350ml','サッポロ ビアサプライズ コクの神髄 350ml',269,'can','#711f2a']
 ];
+window.isMartDrink=product=>['bottle','cup','can'].includes(product[3]);
 
 window.drawProductArt=function drawProductArt(g,id){
   const [, , ,type,color]=window.martProducts[id];
@@ -86,6 +88,33 @@ window.drawProductArt=function drawProductArt(g,id){
     rect(41,38,46,54,10,'#ece7dc');
     mark(64,47);text('カフェラテ',64,63,9);text('Caffè Latte',64,72,6);
     rect(47,76,34,8,3,'#173d69');text('砂糖不使用',64,82,5,'#ffffff');text('300ml',73,101,7,'#251c19');
+  }else if(type==='can'){
+    const metal=light(36,0,91,0,[[0,'#481c25'],[.19,'#a43440'],[.62,'#761b2d'],[1,'#421724']]);
+    shape(metal,()=>{
+      g.moveTo(43,18);g.lineTo(85,18);g.quadraticCurveTo(92,24,92,32);
+      g.lineTo(92,105);g.quadraticCurveTo(89,113,82,114);g.lineTo(46,114);
+      g.quadraticCurveTo(36,112,36,105);g.lineTo(36,33);g.quadraticCurveTo(36,24,43,18);
+    });
+    oval(64,18,23,4,'#e0c373');oval(64,17,20,2,'#f5e1a5');
+    oval(64,108,25,2,'#c4c0b5');
+    oval(64,63,22,37,'#a64235');
+    for(let i=0;i<12;i++){
+      const a=2*Math.PI*i/12;
+      oval(64+19*Math.cos(a),63+32*Math.sin(a),1.7,2.7,'#d4a75e');
+    }
+    shape('#efd592',()=>{
+      for(let i=0;i<10;i++){
+        const a=Math.PI*i/5-Math.PI/2, radius=i%2?3.3:8;
+        const x=64+Math.cos(a)*radius,y=39+Math.sin(a)*radius;
+        if(i===0)g.moveTo(x,y);else g.lineTo(x,y);
+      }
+    });
+    text('SAPPORO',64,52,6.5,'#f3dca6');
+    rect(38,56,52,20,1,'#ca8c53');
+    text('BEER SURPRISE',64,64,6,'#4e2330',48);
+    text('コクの神髄',64,72,8,'#ffe5ac');
+    text('Premium',64,88,8,'#f4d493');
+    text('350ml',64,101,6,'#e5c58d');
   }else if(type==='pudding'){
     shape(light(38,0,89,0,[[0,'#c6a06c'],[.42,'#f6d891'],[1,'#d3a35e']]),()=>{
       g.moveTo(31,46);g.lineTo(97,46);g.lineTo(87,99);g.quadraticCurveTo(64,114,41,99);g.closePath();

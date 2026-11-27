@@ -28,6 +28,7 @@ main{max-width:1100px;margin:auto;padding:24px clamp(10px,3vw,30px) 12px}header{
 .time-picker button[aria-pressed=true]{color:#9ef7c5;border-color:#7ef6bb;background:#173d35}
 .game[data-time=day] #intro{background:linear-gradient(90deg,#0b2336f5,#0b2336b8 30%,#0b233600 64%)}
 #replay{white-space:nowrap}
+#stand{white-space:nowrap;padding:8px 12px}
 .finish-buttons{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
 .finish-buttons button{padding:8px 12px}
 .food-row{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;padding:8px 0;border-top:1px solid #ffffff22}

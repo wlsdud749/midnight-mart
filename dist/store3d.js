@@ -1,6 +1,6 @@
 'use strict';
 
-window.createStoreView = function createStoreView(canvas, stations, products) {
+window.createStoreView = function createStoreView(canvas, stations, products, bench) {
   const gl = canvas.getContext('webgl', {antialias:true,alpha:false});
   if (!gl) return null;
   const program = gl.createProgram();
@@ -52,10 +52,17 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       varying vec3 world;
       void main(){
         vec3 base = tint;
+        if(towerLights > 1.5){
+          vec4 halo=texture2D(signs,tex);
+          gl_FragColor=vec4(halo.rgb,halo.a*opacity);
+          return;
+        }
         if(towerLights > .5) {
-          float warm = smoothstep(0.0,.35,base.r-base.b);
-          base = mix(vec3(1.0,.9,.67),vec3(1.0,.53,.19),warm);
-          base *= .85 + .15 * smoothstep(.10,.85,tint.r);
+          float warmth=smoothstep(.08,.39,tint.r-tint.b);
+          float metal=smoothstep(.28,.78,tint.r);
+          float focus=.74+.26*abs(sin(world.y*.045));
+          vec3 lit=mix(vec3(1.0,.83,.58),vec3(1.0,.53,.18),warmth);
+          base=mix(tint*.72,lit*focus*(.66+.34*tint.r),metal);
         } else if(tex.x >= 0.0) {
           vec4 surface = texture2D(signs, tex);
           if(surface.a < .56) discard;
@@ -138,6 +145,15 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     ink.restore();
     region('product-'+id,x,y,128,128);
   }
+  const haloX=896,haloY=384;
+  const halo=ink.createRadialGradient(haloX+64,haloY+64,0,haloX+64,haloY+64,63);
+  halo.addColorStop(0,'#ffc887a8');
+  halo.addColorStop(.22,'#ff97484a');
+  halo.addColorStop(.62,'#ff5d2412');
+  halo.addColorStop(1,'#ff642b00');
+  ink.fillStyle=halo;
+  ink.fillRect(haloX,haloY,128,128);
+  region('tower-halo',haloX,haloY,128,128);
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,atlas);
@@ -192,7 +208,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
   }
   function packagedProduct(x,z,y,id){
     const [, , ,type,color]=products[id];
-    if(type==='bottle'||type==='cup'){
+    if(window.isMartDrink(products[id])){
       rounded(x+5,y+6,z+4,type==='bottle'?2.3:3.25,5.5,3,color,8);
     }else if(type==='rice'){
       quad([x+1,y+1,z+7],[x+9,y+1,z+7],[x+6,y+9,z+7],[x+4,y+9,z+7],'#334033');
@@ -205,7 +221,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     }else{
       rounded(x+5,y+2.9,z+4,3.55,type==='pudding'?2.1:2.8,3.3,color,8);
     }
-    const tall=type==='bottle'||type==='cup'?14:type==='rice'?11:8;
+    const tall=window.isMartDrink(products[id])?14:type==='rice'?11:8;
     const wide=type==='rice'?12:11;
     front(x+5-wide/2,y-.65,z+8.1,wide,tall,'product-'+id);
     back(x+5-wide/2,y-.65,z+.9,wide,tall,'product-'+id);
@@ -340,46 +356,86 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     }
     box(36,386,78,39,0,27,'#657f86');
   }
+  const towerOrigin={x:795,z:-323,scale:1.57};
   function tower(){
-    const x=767,z=-343;
-    const stretch=1.29;
-    const start=mesh.length;
-    const red='#ef7848',white='#f4d5ad';
-    const levels=[[0,95],[75,81],[145,60],[200,43],[246,27],[290,22],[331,16],[356,11]];
+    const {x,z,scale}=towerOrigin;
+    const orange='#e66335',white='#efe8df',steel='#613f3b';
+    const levels=[[0,46],[30,41],[58,36.7],[84,32.2],[108,27.7],[129,23.7],[146,21.1],[162,18.8],[180,16.4],[198,14.2],[215,12.2],[231,10.5],[243,9.4],[254,8.2],[267,6.7],[278,5.1]];
+    const yaw=.18,cos=Math.cos(yaw),sin=Math.sin(yaw);
+    const world=([a,b,c])=>[x+(a*cos+c*sin)*scale,b*scale,z+(c*cos-a*sin)*scale];
+    const face=(a,b,c,d,color,shade=1)=>quad(world(a),world(b),world(c),world(d),color,shade);
+    const ring=(height,radius)=>[[-1,-1],[1,-1],[1,1],[-1,1]].map(([i,j])=>[i*radius,height,j*radius]);
+    const mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
     function beam(a,b,width,color){
-      const dx=b[0]-a[0],dz=b[2]-a[2];
-      const length=Math.hypot(dx,dz)||1;
-      const u=dz/length*width,v=dx/length*width;
-      quad([a[0]-u,a[1],a[2]+v],[a[0]+u,a[1],a[2]-v],[b[0]+u,b[1],b[2]-v],[b[0]-u,b[1],b[2]+v],color);
-      const u2=v||width, v2=u||width;
-      quad([a[0]-u2,a[1],a[2]-v2],[a[0]+u2,a[1],a[2]+v2],[b[0]+u2,b[1],b[2]+v2],[b[0]-u2,b[1],b[2]-v2],color,.82);
-    }
-    function corners([height,radius]){
-      return [[-1,-1],[1,-1],[1,1],[-1,1]].map(([i,j])=>[x+i*radius,height,z+j*radius]);
-    }
-    for(let i=0;i<levels.length-1;i++){
-      const from=corners(levels[i]), to=corners(levels[i+1]);
-      const color=i%2?white:red;
-      for(let side=0;side<4;side++){
-        const next=(side+1)%4;
-        beam(from[side],to[side],3.8,color);
-        beam(from[side],to[next],1.65,color);
-        beam(from[next],to[side],1.65,color);
-        beam(to[side],to[next],2.15,color);
+      const dir=b.map((v,i)=>v-a[i]);
+      const magnitude=Math.hypot(...dir);
+      const [dx,dy,dz]=dir.map(v=>v/magnitude);
+      const sideLength=Math.hypot(dx,dz);
+      const u=sideLength?[dz/sideLength,0,-dx/sideLength]:[1,0,0];
+      const v=[dy*u[2]-dz*u[1],dz*u[0]-dx*u[2],dx*u[1]-dy*u[0]];
+      function section(p){return [[-1,-1],[1,-1],[1,1],[-1,1]].map(([i,j])=>p.map((n,k)=>n+width*(i*u[k]+j*v[k])));}
+      const start=section(a),end=section(b);
+      for(let i=0;i<4;i++){
+        const j=(i+1)%4;
+        face(start[i],start[j],end[j],end[i],color,[.98,.73,.55,.85][i]);
       }
     }
-    for(const [height,width] of [[196,98],[306,46]]){
-      box(x-width/2,z-width/2,width,width,height,16,'#a16951');
-      box(x-width/2-2,z-width/2-2,width+4,width+4,height+15,4,'#f4ad71');
-      for(let i=5;i<width-3;i+=9)box(x-width/2+i,z+width/2-.4,5,1.5,height+4,8,'#ffe1a3');
+    function slab(height,radius,depth,color){
+      const bottom=ring(height,radius),top=ring(height+depth,radius);
+      face(...top,color);
+      for(let i=0;i<4;i++){
+        const j=(i+1)%4;
+        face(bottom[i],bottom[j],top[j],top[i],color,i%2?.75:1);
+      }
     }
-    for(let i=0;i<7;i++){
-      const w=10-i*.9;
-      box(x-w/2,z-w/2,w,w,354+i*10,10,i%2?white:red);
+    for(let i=0;i<levels.length-1;i++){
+      const [height,radius]=levels[i], [upper,tip]=levels[i+1];
+      const bottom=ring(height,radius),top=ring(upper,tip);
+      const color=i<6||i%2===1?orange:white;
+      for(let edge=0;edge<4;edge++){
+        const next=(edge+1)%4;
+        beam(bottom[edge],top[edge],1.85-i*.076,color);
+        beam(bottom[edge],top[next],.76-i*.029,color);
+        beam(bottom[next],top[edge],.64-i*.025,color);
+        beam(top[edge],top[next],.77-i*.027,color);
+        const mid=ring((height+upper)/2,(radius+tip)/2);
+        beam(mid[edge],mid[next],.39,color);
+        if(i<7){
+          beam(mix(bottom[edge],bottom[next],.25),mix(top[edge],top[next],.5),.29,steel);
+          beam(mix(bottom[edge],bottom[next],.75),mix(top[edge],top[next],.5),.29,steel);
+        }
+      }
     }
-    box(x-1.25,z-1.25,2.5,2.5,424,13,'#fcdac1');
-    rounded(x,437,z,3,2.4,3,'#ffb88b',8);
-    for(let index=start+1;index<mesh.length;index+=8)mesh[index]*=stretch;
+    for(const [height,radius,floors] of [[150,21.5,2],[250,10,1]]){
+      slab(height-3,radius+1.2,2,'#d15a34');
+      slab(height-1,radius,5*floors+.5,'#383c48');
+      for(let floor=0;floor<floors;floor++){
+        const low=ring(height+floor*5,radius+.08);
+        const high=ring(height+3.5+floor*5,radius+.08);
+        const bays=floors===2?13:7;
+        for(let edge=0;edge<4;edge++){
+          const next=(edge+1)%4;
+          for(let j=0;j<bays;j++){
+            const a=(j+.08)/bays,b=(j+.84)/bays;
+            const color=(edge+j+floor)%5===0?'#806152':(edge+j)%3===0?'#ffe2a4':'#d6a679';
+            face(mix(low[edge],low[next],a),mix(low[edge],low[next],b),mix(high[edge],high[next],b),mix(high[edge],high[next],a),color);
+          }
+        }
+      }
+      slab(height+5*floors,radius+.8,1.6,'#f18952');
+    }
+    for(let i=0;i<8;i++){
+      const start=278+i*6.7;
+      slab(start,3.1-i*.30,6.7,i%2===0?orange:white);
+      if(i%2===0)slab(start+.25,3.7-i*.31,.7,'#d37b57');
+    }
+    slab(331.6,.49,1.4,'#f48358');
+  }
+  function towerGlow(){
+    const {x,z,scale}=towerOrigin;
+    for(const [y,width,height,frontage] of [[77,155,85,55],[150,97,36,39],[202,54,75,21],[250,47,22,19],[312,33,51,9],[333,12,12,5]]){
+      front(x-width/2,y*scale-height/2,z+frontage,width,height,'tower-halo');
+    }
   }
   function exterior(){
     flat(-1500,-1100,3500,2480,0,'#243145');
@@ -395,9 +451,21 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     box(507,508,4,4,0,83,'#657982');
     box(485,370,13,8,66,16,'#293a43');
     box(502,506,13,8,66,16,'#293a43');
+    const left=bench.x-24,backZ=bench.y+5;
+    flat(left-4,368,56,36,.29,'#87948d');
+    for(let x=left-3;x<left+48;x+=13)flat(x,373,.5,29,.32,'#657d73');
+    box(left-4,401,56,2,0,2.5,'#a3a99e');
+    for(const support of [left+3,left+42]){
+      box(support,bench.y-6,3,14,0,15,'#546673');
+      box(support,backZ,3,3,6,25,'#51626b');
+    }
+    for(let n=0;n<4;n++)box(left,bench.y-7+n*3,48,2.35,13,2.5,n%2?'#835a40':'#9c7051');
+    for(let n=0;n<3;n++)box(left,backZ,48,2.8,18+n*4,3.25,n%2?'#996f50':'#a97d58');
+    box(left,bench.y-6,3,13,17,2.5,'#61737b');
+    box(left+45,bench.y-6,3,13,17,2.5,'#61737b');
     for(let i=0;i<14;i++){
       const x=i*88-280;
-      const height=65+(i*93)%108, z=87-(i%4)*63;
+      const height=i===11?45:65+(i*93)%108, z=87-(i%4)*63;
       box(x,z,74,53,0,height,i%2?'#233349':'#2a384b');
       box(x+7,z+15,49,27,height,9,'#26384b');
       for(let row=17;row<height-10;row+=15){
@@ -467,8 +535,8 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       box(x+3,294,7,6,12,13,'#387661');
       box(x,291,13,12,17,8,'#428772');
     }
-    box(595,275,4,5,0,84,'#3e5262');
-    box(586,269,20,16,83,3,'#ead697');
+    box(657,275,4,5,0,84,'#3e5262');
+    box(648,269,20,16,83,3,'#ead697');
   }
   function pedestrianSignal(green){
     for(const [x,z] of [[485,370],[502,506]]){
@@ -528,6 +596,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
   }
   const street=build(exterior);
   const towerMesh=build(tower);
+  const towerGlowMesh=build(towerGlow);
   const sleeperMesh=build(sleepingPerson);
   const nightSky=build(stars);
   const daySky=build(clouds);
@@ -615,7 +684,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     const angle=started?player.angle:-.095;
     const pitch=started?player.pitch:.085;
-    const eye=started?[player.x,63+Math.sin(player.step)*.8,player.y]:[495,68,557];
+    const eye=started?[player.x,player.seated?39:63+Math.sin(player.step)*.8,player.y]:[495,68,557];
     gl.uniform3f(uniforms.eye,...eye);
     gl.uniform2f(uniforms.heading,Math.sin(angle),Math.cos(angle));
     gl.uniform2f(uniforms.tilt,Math.sin(pitch),Math.cos(pitch));
@@ -637,6 +706,18 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       gl.uniform1f(uniforms.towerLights,Number(!day));
       draw(towerMesh);
       gl.uniform1f(uniforms.towerLights,0);
+      if(!day){
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+        gl.depthMask(false);
+        gl.uniform1f(uniforms.towerLights,2);
+        gl.uniform1f(uniforms.opacity,.62);
+        draw(towerGlowMesh);
+        gl.uniform1f(uniforms.opacity,1);
+        gl.uniform1f(uniforms.towerLights,0);
+        gl.depthMask(true);
+        gl.disable(gl.BLEND);
+      }
       draw(pedestrianSignals[Number(walkSignal)]);
       draw(started&&!finished&&player.x>274&&player.x<367&&player.y<327?opened:closed);
       drawGlass(glass,.28);
