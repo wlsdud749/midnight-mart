@@ -126,6 +126,8 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
   sign('maya','MAYA','#edf4ec','#203f38',128);
   sign('hana','HANA','#edf4ec','#203f38',128);
   sign('ana','ANA','#edf4ec','#203f38',128);
+  sign('fridge-temp','5 °C','#1d3d4a','#a3f5ff',128);
+  sign('store-poster','ファミマ · 24H','#e6eee4','#29616a',128);
   const signColors = {drinks:'#245373',dessert:'#764859',meals:'#2a6d59',hot:'#9b5936',register:'#2c5369',microwave:'#384551'};
   for(const station of stations)sign(station.id, station.label, signColors[station.id], '#fff7e8');
   for(let id=0;id<products.length;id++){
@@ -208,6 +210,10 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     front(x+5-wide/2,y-.65,z+8.1,wide,tall,'product-'+id);
     back(x+5-wide/2,y-.65,z+.9,wide,tall,'product-'+id);
   }
+  const cabinetHeight=s=>s.id==='drinks'?114:s.storage==='chilled'?74:68;
+  function cabinetFaces(s){
+    return s.side==='both'?[{z:s.y-.08,reverse:true},{z:s.y+s.h+.08,reverse:false}]:[{z:s.y+s.h+.08,reverse:false}];
+  }
   function fixture(s){
     const {x,y,w,h,id,ids}=s;
     if(id==='microwave'){
@@ -238,13 +244,13 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       front(x+12,25,y+h+.3,w-24,14,id);
       return;
     }
-    const cold=id==='drinks', hot=id==='hot';
-    const tall=cold?114:hot?68:55;
+    const cold=s.storage==='chilled',hot=s.storage==='hot';
+    const tall=cabinetHeight(s);
     box(x,y,w,h,0,6,cold?'#50778a':'#4c6067');
     box(x,y,3,h,6,tall-6,cold?'#86afb9':hot?'#efb66e':'#aeb9b2');
     box(x+w-3,y,3,h,6,tall-6,cold?'#86afb9':hot?'#efb66e':'#aeb9b2');
-    box(x+3,y+(cold?3:h/2-2),w-6,cold?4:4,6,tall-6,cold?'#a8c9cb':hot?'#b86d43':'#889d98');
-    const levels=cold?[12,34,56,78]:hot?[12,35]:[10,31];
+    box(x+3,y+(s.side==='both'?h/2-2:3),w-6,4,6,tall-6,cold?'#a8c9cb':'#b86d43');
+    const levels=id==='drinks'?[12,34,56,78]:cold?[10,30,49]:[12,35];
     for(const bottom of levels){
       box(x+3,y,w-6,h,bottom,3,hot?'#da985d':'#c4cdc3');
       for(let i=0;i<Math.floor((w-10)/14);i++){
@@ -255,7 +261,18 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       }
     }
     box(x,y,w,h,tall-5,5,hot?'#fcd084':cold?'#608fa4':'#b0c2b5');
-    if(cold)for(let i=x+45;i<x+w;i+=45)box(i,y+h-2,2,2,6,tall-11,'#719ca9');
+    if(cold){
+      for(const {z,reverse} of cabinetFaces(s)){
+        box(x+2,z-.35,w-4,.8,7,2,'#789daa');
+        box(x+2,z-.35,w-4,.8,tall-9,2,'#dcf5f9');
+        for(let i=x+4;i<x+w-4;i+=36){
+          box(i,z-.3,1.2,.6,8,tall-15,'#719ca9');
+          box(i+3,z-.65,1.6,1.3,27,11,'#c2d9dc');
+        }
+        const drawFace=reverse?back:front;
+        drawFace(x+w-25,9,z+(reverse?-.15:.15),19,5,'fridge-temp');
+      }
+    }
     front(x+3,tall-5,y+h+.2,w-6,13,id);
     if(s.side==='both')back(x+3,tall-5,y-.2,w-6,13,id);
   }
@@ -318,8 +335,8 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     box(402,43,180,46,0,43,'#71888c');
     box(402,43,180,10,43,47,'#95aaa7');
     for(let i=0;i<13;i++){
-      box(410+i*12,61,8,12,43,16,products[i%products.length][4]);
-      box(411+i*12,73,6,1,48,5,'#f0e8ce');
+      box(410+i*12,61,8,12,43,16,['#a7b6a7','#c7b698','#bac8d1'][i%3]);
+      box(411+i*12,73,6,1,48,5,'#e1e5dc');
     }
     box(36,386,78,39,0,27,'#657f86');
   }
@@ -432,10 +449,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       box(x,212,w,5,0,64,'#a9b8a0');
       box(x,258,w,7,0,11,'#94a096');
       box(x,271,w,8,0,8,'#6e9590');
-      for(let level=13;level<=50;level+=18){
-        box(x+2,241,w-4,15,level,3,'#73877d');
-        for(let i=0;i<12;i++)packagedProduct(x+5+i*13,243,level+3,i%products.length);
-      }
+      front(x+55,20,260,60,30,'store-poster');
       for(let bx=x+41;bx<x+w;bx+=42)box(bx,274,3,2,7,57,'#9ac6bc');
       box(x,274,w,2,48,2,'#d6eade');
     }
@@ -544,6 +558,17 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       quad([x+5,8,276.4],[x+13,8,276.4],[x+41,64,276.4],[x+33,64,276.4],'#bed6de');
     }
   });
+  const cabinetGlass=build(()=>{
+    for(const s of stations.filter(station=>station.storage==='chilled')){
+      const {x,w}=s,tall=cabinetHeight(s);
+      for(const {z} of cabinetFaces(s)){
+        quad([x+3,9,z],[x+w-3,9,z],[x+w-3,tall-8,z],[x+3,tall-8,z],'#a6d1dd');
+        for(let pos=x+6;pos<x+w-17;pos+=36){
+          quad([pos,11,z],[pos+3,11,z],[pos+14,tall-9,z],[pos+11,tall-9,z],'#e6fbfc');
+        }
+      }
+    }
+  });
   const ovenGlow=build(()=>{
     box(514,388.05,26,.3,37,12,'#dc9751');
     box(551,387.8,7,.2,46,3,'#8df4a2');
@@ -562,6 +587,16 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     gl.uniform2f(uniforms.modelTurn,Math.sin(actor.angle),Math.cos(actor.angle));
     gl.uniform1f(uniforms.stride,swing*6);
     draw(model);
+  }
+  function drawGlass(model,opacity){
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);
+    gl.uniform1f(uniforms.opacity,opacity);
+    draw(model);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+    gl.uniform1f(uniforms.opacity,1);
   }
   return function render(player,inside,started,heating,timeOfDay,finished,staff,guests,sleeper,time,walkSignal){
     const width=Math.round(canvas.clientWidth);
@@ -596,6 +631,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     gl.uniform1f(uniforms.stride,0);
     draw(inside?store:street);
     if(inside&&heating)draw(ovenGlow);
+    if(inside)drawGlass(cabinetGlass,.16);
     if(!inside){
       draw(day?daySky:nightSky);
       gl.uniform1f(uniforms.towerLights,Number(!day));
@@ -603,14 +639,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       gl.uniform1f(uniforms.towerLights,0);
       draw(pedestrianSignals[Number(walkSignal)]);
       draw(started&&!finished&&player.x>274&&player.x<367&&player.y<327?opened:closed);
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-      gl.depthMask(false);
-      gl.uniform1f(uniforms.opacity,.28);
-      draw(glass);
-      gl.depthMask(true);
-      gl.disable(gl.BLEND);
-      gl.uniform1f(uniforms.opacity,1);
+      drawGlass(glass,.28);
       if(!day){
         gl.uniform3f(uniforms.modelOffset,sleeper.x,Math.sin(time/730)*.32,sleeper.y);
         gl.uniform2f(uniforms.modelTurn,Math.sin(sleeper.angle),Math.cos(sleeper.angle));

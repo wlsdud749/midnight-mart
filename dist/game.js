@@ -5,10 +5,10 @@ const scene = el('scene');
 const yen = n => '¥' + n.toLocaleString('ja-JP');
 const products = window.martProducts;
 const stations = [
-  {id:'drinks',name:'음료 냉장고',jp:'ドリンク',label:'DRINKS',x:72,y:43,w:271,h:60,ids:[3,4],side:'bottom'},
-  {id:'dessert',name:'디저트 매대',jp:'デザート',label:'SWEETS',x:76,y:169,w:133,h:56,ids:[5,6],side:'both'},
-  {id:'meals',name:'도시락·주먹밥 매대',jp:'お弁当・おむすび',label:'BENTO & ONIGIRI',x:92,y:292,w:190,h:59,ids:[0,1,2],side:'both'},
-  {id:'hot',name:'핫스낵 진열대',jp:'ホットスナック',label:'HOT SNACKS',x:398,y:161,w:86,h:59,ids:[7],side:'bottom'},
+  {id:'drinks',name:'음료 냉장고',jp:'冷蔵 · ドリンク',label:'冷蔵 DRINKS',x:72,y:43,w:271,h:60,ids:[3,4],side:'bottom',storage:'chilled'},
+  {id:'dessert',name:'디저트 냉장고',jp:'冷蔵 · デザート',label:'冷蔵 SWEETS',x:76,y:169,w:133,h:56,ids:[5,6],side:'both',storage:'chilled'},
+  {id:'meals',name:'도시락·주먹밥 냉장고',jp:'冷蔵 · お弁当・おむすび',label:'冷蔵 BENTO & ONIGIRI',x:92,y:292,w:190,h:59,ids:[0,1,2],side:'both',storage:'chilled'},
+  {id:'hot',name:'핫스낵 온장고',jp:'ホットスナック',label:'保温 HOT SNACKS',x:398,y:161,w:86,h:59,ids:[7],side:'bottom',storage:'hot'},
   {id:'register',name:'계산대',jp:'レジ',label:'CHECKOUT',x:484,y:161,w:101,h:59,side:'bottom'},
   {id:'microwave',name:'셀프 전자레인지',jp:'電子レンジ',label:'MICROWAVE',x:491,y:387,w:90,h:35,side:'both'}
 ];
