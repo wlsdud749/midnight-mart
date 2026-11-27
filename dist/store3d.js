@@ -118,6 +118,9 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
   sign('entry','入口 · ENTRANCE','#227d69','#ecfff2',128);
   sign('exit','出口 · EXIT','#187558','#f0fff6',128);
   sign('minh','MINH','#edf4ec','#203f38',128);
+  sign('maya','MAYA','#edf4ec','#203f38',128);
+  sign('hana','HANA','#edf4ec','#203f38',128);
+  sign('ana','ANA','#edf4ec','#203f38',128);
   const signColors = {drinks:'#245373',dessert:'#764859',meals:'#2a6d59',hot:'#9b5936',register:'#2c5369',microwave:'#384551'};
   for(const station of stations)sign(station.id, station.label, signColors[station.id], '#fff7e8');
   const tex = gl.createTexture();
@@ -239,7 +242,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     front(x+3,tall-5,y+h+.2,w-6,13,id);
     if(s.side==='both')back(x+3,tall-5,y-.2,w-6,13,id);
   }
-  function person({shirt='#327f77',skin='#e4b091',pants='#354653',hair='#292832',clerk=false,accessory}={}){
+  function person({shirt='#327f77',skin='#e4b091',pants='#354653',hair='#292832',badge,accessory}={}){
     const x=0,z=0;
     box(x-9,z-4,7,9,1,23,pants);
     box(x+2,z-4,7,9,1,23,pants);
@@ -251,9 +254,9 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     rounded(x,57,z,3.4,6,3.8,skin);
     rounded(x,66,z,7.1,9,6.7,skin);
     rounded(x,72,z-1,7.5,4.4,6.9,hair);
-    if(clerk||accessory==='cap'){
-      rounded(x,74,z-.5,7.6,2.8,6.8,clerk?'#3d9387':shirt);
-      rounded(x,72.3,z+4,7.6,1,5,clerk?'#5caa98':shirt);
+    if(badge||accessory==='cap'){
+      rounded(x,74,z-.5,7.6,2.8,6.8,badge?'#3d9387':shirt);
+      rounded(x,72.3,z+4,7.6,1,5,badge?'#5caa98':shirt);
     }
     if(accessory==='longHair')rounded(x,65,z-4,7,10,4,hair);
     if(accessory==='backpack')rounded(x,42,z-7,9,12,5,'#5a564b');
@@ -262,7 +265,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     rounded(x+2.7,66.8,z+5.7,.72,.7,.65,'#3c383c',8);
     rounded(x,64.3,z+6.2,1.15,1.2,1.2,skin,8);
     box(x-1.5,z+5.9,3,.5,61.4,.43,'#9e675f');
-    if(clerk)front(x+3,48,z+6.8,6,2.4,'minh');
+    if(badge)front(x+3,48,z+6.8,6,2.4,badge);
   }
   function interior(){
     for(let z=30;z<450;z+=24)for(let x=20;x<622;x+=24){
@@ -353,6 +356,11 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     box(-1050,502,2450,5,0,3,'#859598');
     for(let x=-1010;x<1300;x+=91)flat(x,437,48,2,.1,'#a5a393');
     for(const z of [387,492])flat(-1050,z,2450,1.2,.12,'#7c8790');
+    for(let z=382;z<504;z+=13)flat(496,z,51,6,.22,'#c5c7bc');
+    box(490,372,4,4,0,83,'#657982');
+    box(507,508,4,4,0,83,'#657982');
+    box(485,370,13,8,66,16,'#293a43');
+    box(502,506,13,8,66,16,'#293a43');
     for(let i=0;i<14;i++){
       const x=i*88-280;
       const height=65+(i*93)%108, z=87-(i%4)*63;
@@ -431,6 +439,18 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     box(595,275,4,5,0,84,'#3e5262');
     box(586,269,20,16,83,3,'#ead697');
   }
+  function pedestrianSignal(green){
+    for(const [x,z] of [[485,370],[502,506]]){
+      for(const face of [z-.35,z+8.25]){
+        const color=green?'#54f3a6':'#f47363';
+        const y=green?69:75;
+        box(x+5,face,3,.12,y+4,2,color);
+        box(x+4,face,5,.12,y+1,2,color);
+        box(x+3,face,2,.12,y-1,2,color);
+        box(x+8,face,2,.12,y-1,2,color);
+      }
+    }
+  }
   function sleepingPerson(){
     rounded(0,5,-4,9,5,14,'#785857');
     rounded(-5,3,-22,4,3,11,'#485063');
@@ -481,7 +501,13 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
   const nightSky=build(stars);
   const daySky=build(clouds);
   const store=build(interior);
-  const clerk=build(()=>person({clerk:true}));
+  const clerks=[
+    {badge:'minh'},
+    {badge:'maya',skin:'#b78264',hair:'#3f2e31',accessory:'longHair'},
+    {badge:'hana',skin:'#cb987c',hair:'#2b2630',accessory:'longHair'},
+    {badge:'ana',skin:'#d7a58b',hair:'#534038'}
+  ].map(profile=>build(()=>person(profile)));
+  const pedestrianSignals=[build(()=>pedestrianSignal(false)),build(()=>pedestrianSignal(true))];
   const people=[
     {shirt:'#b8735d',pants:'#333448',accessory:'longHair'},
     {shirt:'#557c9b',pants:'#62584b',skin:'#b87f63',accessory:'cap'},
@@ -520,7 +546,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
     gl.uniform1f(uniforms.stride,swing*6);
     draw(model);
   }
-  return function render(player,inside,started,heating,timeOfDay,finished,staff,guests,sleeper,time){
+  return function render(player,inside,started,heating,timeOfDay,finished,staff,guests,sleeper,time,walkSignal){
     const width=Math.round(canvas.clientWidth);
     const height=Math.round(canvas.clientHeight);
     if(!width||!height)return;
@@ -558,6 +584,7 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       gl.uniform1f(uniforms.towerLights,Number(!day));
       draw(towerMesh);
       gl.uniform1f(uniforms.towerLights,0);
+      draw(pedestrianSignals[Number(walkSignal)]);
       draw(started&&!finished&&player.x>274&&player.x<367&&player.y<327?opened:closed);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
@@ -567,11 +594,13 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       gl.depthMask(true);
       gl.disable(gl.BLEND);
       gl.uniform1f(uniforms.opacity,1);
-      gl.uniform3f(uniforms.modelOffset,sleeper.x,Math.sin(time/730)*.32,sleeper.y);
-      gl.uniform2f(uniforms.modelTurn,Math.sin(sleeper.angle),Math.cos(sleeper.angle));
-      draw(sleeperMesh);
+      if(!day){
+        gl.uniform3f(uniforms.modelOffset,sleeper.x,Math.sin(time/730)*.32,sleeper.y);
+        gl.uniform2f(uniforms.modelTurn,Math.sin(sleeper.angle),Math.cos(sleeper.angle));
+        draw(sleeperMesh);
+      }
     }
-    if(inside&&staff)drawPerson(clerk,staff);
+    if(inside&&staff)drawPerson(clerks[staff.profile],staff);
     guests.forEach(guest=>{if(guest.inside===inside)drawPerson(people[guest.appearance],guest);});
   };
 };

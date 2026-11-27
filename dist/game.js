@@ -24,10 +24,18 @@ const stations = [
 const fixtures = [...stations,{x:402,y:43,w:180,h:46},{x:36,y:386,w:78,h:39}];
 const exit = {id:'exit',x:320,y:444};
 const sleeper={id:'sleeper',x:580,y:337,angle:1.48};
+const crossing={x:492,y:374};
 const spawn = {x:320,y:415,angle:0,pitch:.11,step:0};
 const player = {...spawn};
 const staffSpawn={x:567,y:114};
-const staff={...staffSpawn,angle:0,step:0,station:null,at:null,idle:2};
+const staffRoster=[
+  {name:'민',origin:'베트남'},
+  {name:'마야',origin:'네팔'},
+  {name:'하나',origin:'인도네시아'},
+  {name:'아나',origin:'필리핀'}
+];
+const staff={...staffSpawn,profile:-1,angle:0,step:0,station:null,at:null,idle:2};
+let nextCrossingTone=0;
 const guestRoutes=[
   {inside:true,points:[[349,128],[239,130],[320,138]],clip:'guestTea',jp:'温かいお茶にしようかな。',ko:'따뜻한 차로 할까?'},
   {inside:true,points:[[372,365],[315,369],[306,314]],clip:'guestRice',jp:'おにぎり、どれにする？',ko:'주먹밥은 어떤 걸로 할래?'},
@@ -277,7 +285,7 @@ const staffLines={
 };
 function staffLine(key){
   const [jp,ko]=staffLines[key];
-  return '<p class="staff-line"><small>민</small><strong lang="ja">'+jp+'</strong><small>'+ko+'</small></p>';
+  return '<p class="staff-line"><small>'+staffRoster[staff.profile].name+'</small><strong lang="ja">'+jp+'</strong><small>'+ko+'</small></p>';
 }
 function talk(line='greeting'){
   if(modal!=='staff')openDialog('staff');
@@ -386,7 +394,8 @@ function renderDialog(announcement=''){
   const focus=document.activeElement;
   const control=focus?.matches('[data-add]')?'[data-add="'+focus.dataset.add+'"]':focus?.matches('[data-remove]')?'[data-remove="'+focus.dataset.remove+'"]':null;
   kicker.textContent=station?.jp||({staff:'スタッフ',cart:'お買い物かご',scan:'レジ',bag:'レジ',receipt:'レジ',purchase:'お買い上げ',finish:timeOfDay==='day'?'東京の昼':'東京の夜'}[modal]||'');
-  title.textContent=station?.name||({staff:'민 · 베트남 출신 직원',food:'구매한 음식',sleeper:'잠든 켄지',cart:'장바구니',scan:'계산대',bag:'봉투',receipt:'영수증',purchase:receipt?.printed?'영수증':'구매 내역',finish:'쇼핑 완료'}[modal]||'');
+  const profile=staffRoster[staff.profile];
+  title.textContent=station?.name||({staff:profile&&profile.name+' · '+profile.origin+' 출신 직원',food:'구매한 음식',sleeper:'잠든 켄지',cart:'장바구니',scan:'계산대',bag:'봉투',receipt:'영수증',purchase:receipt?.printed?'영수증':'구매 내역',finish:'쇼핑 완료'}[modal]||'');
   const ids=cart.flatMap((n,id)=>n?[id]:[]);
   if(modal==='staff'){
     body.innerHTML=staffLine(announcement||'greeting')+'<div class="staff-options">'+
@@ -590,6 +599,9 @@ function resetVisit(){
 
 function enter(){
   stopGuestLine();
+  const otherProfiles=staffRoster.map((_,i)=>i).filter(i=>i!==staff.profile);
+  const profile=otherProfiles[Math.floor(Math.random()*otherProfiles.length)];
+  Object.assign(staff,{...staffSpawn,profile,angle:0,step:0,station:null,at:null,idle:2});
   visitCount++;
   resetGuests();
   inside=true;
@@ -624,13 +636,15 @@ function leave(){
   if(finished)openDialog('finish');
 }
 function canWalk(x,y){
-  if(!inside)return x>=35&&x<=605&&y<=480&&(y>=303||(!finished&&y>=280&&x>281&&x<359))&&Math.hypot(x-sleeper.x,y-sleeper.y)>=15;
+  if(!inside)return x>=35&&x<=605&&y<=480&&(y>=303||(!finished&&y>=280&&x>281&&x<359))&&
+    (timeOfDay==='day'||Math.hypot(x-sleeper.x,y-sleeper.y)>=15)&&Math.hypot(x-crossing.x,y-crossing.y)>=7;
   if(Math.hypot(x-staff.x,y-staff.y)<15)return false;
   return x>=35&&x<=605&&y>=42&&y<=450&&(y<=432||(x>286&&x<354))&&fixtures.every(r=>x+7<=r.x||x-7>=r.x+r.w||y+7<=r.y||y-7>=r.y+r.h);
 }
 function stationNear(){
   if(modal||mealMotion)return null;
   if(!inside){
+    if(timeOfDay==='day')return null;
     const dx=sleeper.x-player.x, dy=sleeper.y-player.y;
     const distance=Math.hypot(dx,dy);
     return distance<57&&Math.sin(player.angle)*dx-Math.cos(player.angle)*dy>distance*.4?sleeper:null;
@@ -835,6 +849,24 @@ function drawMap(){
   map.beginPath();map.moveTo(0,-5);map.lineTo(3.5,4);map.lineTo(0,2);map.lineTo(-3.5,4);map.closePath();map.fill();
   map.restore();
 }
+function updateCrossing(time){
+  const green=time%14000<7200;
+  const dx=crossing.x-player.x,dy=crossing.y-player.y;
+  const distance=Math.hypot(dx,dy);
+  if(!green||!started||inside||!audio||muted||distance>170||time<nextCrossingTone)return green;
+  nextCrossingTone=time+1050;
+  const gain=audio.createGain();
+  gain.gain.value=.40*(1-distance/190);
+  const pan=audio.createStereoPanner?.();
+  if(pan){
+    pan.pan.value=Math.max(-.85,Math.min(.85,(dx*Math.cos(player.angle)+dy*Math.sin(player.angle))/125));
+    gain.connect(pan).connect(master);
+  }else gain.connect(master);
+  const now=audio.currentTime;
+  tone(1530,now,.12,.16,'sine',gain);
+  tone(1100,now+.16,.18,.15,'sine',gain);
+  return green;
+}
 let previous=0;
 function frame(time){
   const dt=Math.min((time-previous)/1000,.035);
@@ -859,7 +891,8 @@ function frame(time){
   if(inside)moveStaff(dt);
   if(started)moveGuests(dt);
   updateGuestAudio(time);
-  renderScene?.(player,inside,started,microwave.endsAt>0,timeOfDay,finished,staff,guests,sleeper,time);
+  const walkSignal=updateCrossing(time);
+  renderScene?.(player,inside,started,microwave.endsAt>0,timeOfDay,finished,staff,guests,sleeper,time,walkSignal);
   animateMeal(time);
   if(modal==='microwave'&&microwave.endsAt){
     const seconds=Math.max(0,Math.ceil((microwave.endsAt-performance.now())/1000));
@@ -877,7 +910,7 @@ function frame(time){
   action.disabled=!nearby&&!modal;
   const staffId=nearby?.id;
   const verb=staffStops[staffId]&&!receipt
-    ?staff.station===staffId?'민이 오는 중':staff.at===staffId?(staffId==='hot'?'주문하기':'민과 대화'):'직원 호출'
+    ?staff.station===staffId?staffRoster[staff.profile].name+' · 오는 중':staff.at===staffId?(staffId==='hot'?'주문하기':'직원과 대화'):'직원 호출'
     :({register:'구매 내역',microwave:'전자레인지 사용',exit:'매장 나가기',sleeper:'살펴보기'})[staffId]||'둘러보기';
   const actionText=modal?'닫기':nearby?verb:'상호작용';
   if(action.textContent!==actionText)action.textContent=actionText;
