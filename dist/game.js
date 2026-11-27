@@ -21,10 +21,10 @@ const spawn = {x:320,y:415,angle:0,pitch:.11,step:0};
 const player = {...spawn,seated:false};
 const staffSpawn={x:567,y:114};
 const staffRoster=[
-  {name:'민',origin:'베트남'},
-  {name:'마야',origin:'네팔'},
-  {name:'하나',origin:'인도네시아'},
-  {name:'아나',origin:'필리핀'}
+  {name:'민',origin:'베트남',voice:'Male'},
+  {name:'마야',origin:'네팔',voice:'Female'},
+  {name:'하나',origin:'인도네시아',voice:'Female'},
+  {name:'아나',origin:'필리핀',voice:'Female'}
 ];
 const staff={...staffSpawn,profile:-1,angle:0,step:0,station:null,at:null,idle:2};
 let crossingBuffer, crossingAudio;
@@ -35,17 +35,19 @@ const guestRoutes=[
   {inside:false,points:[[445,391],[535,423],[481,454]],clip:'guestView',jp:'東京タワー、きれいだね。',ko:'도쿄타워, 예쁘네.'}
 ];
 const guests=guestRoutes.map(route=>({...route}));
-const guestNames=['아오이','료','미사키','하루','유타','나오','사키','쇼','유이'];
+const guestProfiles=[['아오이','Female'],['료','Male'],['미사키','Female'],['하루','Male'],['유타','Male'],['나오','Female'],['사키','Female'],['쇼','Male'],['유이','Female']];
 let visitCount=0;
 function resetGuests(){
   guests.forEach((g,i)=>{
-    const appearance=(Math.max(visitCount-1,0)*guests.length+i)%guestNames.length;
-    Object.assign(g,{appearance,name:guestNames[appearance],x:g.points[0][0],y:g.points[0][1],angle:0,point:1,pause:1+i*.7,step:0,nextLine:0});
+    const appearance=(Math.max(visitCount-1,0)*guests.length+i)%guestProfiles.length;
+    const [name,voice]=guestProfiles[appearance];
+    Object.assign(g,{appearance,name,voice,x:g.points[0][0],y:g.points[0][1],angle:0,point:1,pause:1+i*.7,step:0,nextLine:0});
   });
 }
 resetGuests();
 const heldFood=Array(products.length).fill(0);
 let warmBento=0, foodResult='';
+let bagRaisedAt=null;
 let mealMotion=null, paymentMotion=null, guestAudio=null, pendingGuest=null, nextGuestLine=0;
 const cart = Array(products.length).fill(0);
 const keys = new Set();
@@ -180,7 +182,11 @@ function fx(id){
 let muted=false;
 let spoken;
 let speechSequence=0;
-function say(jp,ko){
+function voiceClip(key,voice){
+  return voices?.[key+voice];
+}
+function say(key){
+  const [jp,ko]=staffLines[key];
   stopGuestLine();
   nextGuestLine=performance.now()+4600;
   const caption=el('caption');
@@ -192,13 +198,14 @@ function say(jp,ko){
   clearTimeout(captionTimer);
   captionTimer=setTimeout(()=>{caption.hidden=true;},2850);
   if(muted)return;
-  const id={'いらっしゃいませ！':'welcome','かしこまりました！':'order',[staffLines.bag[0]]:'bag',[staffLines.receipt[0]]:'receipt',[staffLines.thanks[0]]:'thanks'}[jp];
+  const voice=staffRoster[staff.profile].voice;
   const sequence=++speechSequence;
   if(spoken)spoken.stop();
   spoken=null;
-  Promise.resolve(voices?.[id]).then(buffer=>{
+  Promise.resolve(voiceClip(key,voice)).then(buffer=>{
     if(muted||sequence!==speechSequence)return;
     if(buffer){
+      window.speechSynthesis?.cancel();
       spoken=audio.createBufferSource();
       spoken.buffer=buffer;
       spoken.connect(master);
@@ -208,7 +215,9 @@ function say(jp,ko){
     if(!window.speechSynthesis)return;
     const utterance=new SpeechSynthesisUtterance(jp);
     utterance.lang='ja-JP';
-    utterance.voice=speechSynthesis.getVoices().find(v=>v.lang.startsWith('ja'))||null;
+    utterance.voice=speechSynthesis.getVoices().find(v=>v.lang.startsWith('ja')&&
+      (voice==='Male'?/keita|ichiro|male\b/i.test(v.name)&&!/female/i.test(v.name):/nanami|ayumi|haruka|female/i.test(v.name)))||null;
+    if(!utterance.voice)utterance.pitch=voice==='Male'?.78:1.12;
     speechSynthesis.cancel();
     speechSynthesis.speak(utterance);
   });
@@ -245,6 +254,7 @@ function closeDialog(){
   el('close').blur();
 }
 const staffLines={
+  welcome:['いらっしゃいませ！','어서 오세요!'],
   coming:['ただいま伺います。','지금 갈게요.'],
   greeting:['ご注文ですか？','무엇을 도와드릴까요?'],
   recommend:['夜食なら、紅しゃけのおむすびと温かいファミチキがおすすめです。','야식으로 홍연어 주먹밥과 따뜻한 파미치키를 추천해요.'],
@@ -261,7 +271,7 @@ function staffLine(key){
 function talk(line='greeting'){
   if(modal!=='staff')openDialog('staff');
   renderDialog(line);
-  say(...staffLines[line]);
+  say(line);
 }
 function openDialog(id){
   keys.clear();
@@ -294,7 +304,7 @@ function openCheckout(){
   if(!receipt){talk();return;}
   const pending=receipt.bag==null?'bag':receipt.printed==null?'receipt':null;
   openDialog(pending||'purchase');
-  if(pending)say(...staffLines[pending]);
+  if(pending)say(pending);
 }
 function openFood(){
   foodResult='';
@@ -479,7 +489,7 @@ el('panel-body').onclick=e=>{
     const adding=data.add!==undefined;
     change(id,adding?1:-1);
     if(id===7&&adding){
-      say(...staffLines.order);
+      say('order');
       renderDialog('order');
     }else renderDialog();
   }else if(data.staff==='recommend'&&modal==='staff'){
@@ -489,7 +499,7 @@ el('panel-body').onclick=e=>{
     talk('order');
   }else if(data.staff==='register'&&modal==='staff'){
     openDialog('register');
-    say(...staffLines.register);
+    say('register');
   }else if('scan' in data&&modal==='register'&&total()>0&&total()<=wallet){
     scanItems=cart.flatMap((n,id)=>Array(n).fill(id));
     scanCount=0;
@@ -505,7 +515,7 @@ el('panel-body').onclick=e=>{
       receipt.printed=data.answer==='yes';
       updateObjective();
       openDialog('purchase');
-      say(...staffLines.thanks);
+      say('thanks');
     }
   }else if('heat' in data&&modal==='microwave'){
     startMicrowave();
@@ -574,6 +584,8 @@ function resetVisit(){
   heldFood.fill(0);
   warmBento=0;
   foodResult='';
+  bagRaisedAt=null;
+  el('carry-motion').hidden=true;
   mealMotion=null;
   el('meal-motion').hidden=el('meal-status').hidden=true;
   stopGuestLine();
@@ -609,7 +621,7 @@ function enter(){
   el('minimap').hidden=false;
   playEntry();
   startMusic();
-  say('いらっしゃいませ！','어서 오세요!');
+  say('welcome');
 }
 function toggleBench(){
   if(inside||modal||mealMotion)return;
@@ -694,7 +706,7 @@ function summon(station){
   staff.station=station;
   staff.at=null;
   fx('call');
-  say(...staffLines.coming);
+  say('coming');
 }
 function moveStaff(dt){
   const destination=staffStops[staff.station]||staffSpawn;
@@ -822,7 +834,7 @@ function updateGuestAudio(ms){
   guest.nextLine=ms+15500;
   const request={guest};
   pendingGuest=request;
-  Promise.resolve(voices?.[guest.clip]).then(buffer=>{
+  Promise.resolve(voiceClip(guest.clip,guest.voice)).then(buffer=>{
     if(pendingGuest!==request)return;
     pendingGuest=null;
     if(!buffer||muted||modal||mealMotion||inside!==guest.inside||distance(guest)>=180)return;
@@ -867,6 +879,14 @@ function drawMap(){
   map.fillStyle='#ffffff';
   map.beginPath();map.moveTo(0,-5);map.lineTo(3.5,4);map.lineTo(0,2);map.lineTo(-3.5,4);map.closePath();map.fill();
   map.restore();
+}
+function updateCarryMotion(time){
+  const canvas=el('carry-motion');
+  const visible=started&&receipt?.bag===true&&!modal&&!mealMotion&&!paymentMotion;
+  canvas.hidden=!visible;
+  if(!visible)return;
+  if(bagRaisedAt===null)bagRaisedAt=time;
+  window.drawCarryMotion(canvas,time,player.step,bagRaisedAt);
 }
 function stopCrossingAudio(){
   if(!crossingAudio)return;
@@ -926,6 +946,7 @@ function frame(time){
   renderScene?.(player,inside,started,microwave.endsAt>0,timeOfDay,finished,staff,guests,sleeper,time,walkSignal);
   animateMeal(time);
   animatePayment(time);
+  updateCarryMotion(time);
   if(modal==='microwave'&&microwave.endsAt){
     const seconds=Math.max(0,Math.ceil((microwave.endsAt-performance.now())/1000));
     if(seconds!==microwave.shownSeconds){
