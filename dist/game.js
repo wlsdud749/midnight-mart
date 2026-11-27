@@ -54,7 +54,7 @@ function resetGuests(){
 resetGuests();
 const heldFood=Array(products.length).fill(0);
 let warmBento=0, foodResult='';
-let mealMotion=null, guestAudio=null, pendingGuest=null, nextGuestLine=0;
+let mealMotion=null, paymentMotion=null, guestAudio=null, pendingGuest=null, nextGuestLine=0;
 const cart = Array(products.length).fill(0);
 const keys = new Set();
 const touches = new Map();
@@ -197,6 +197,7 @@ const effects={
   add:[[659,0,.1],[988,.065,.13]],
   scan:[[1520,0,.075]],
   pay:[[523,0,.19],[659,.105,.2],[784,.21,.22],[1047,.33,.35]],
+  cash:[[950,0,.08],[1420,.043,.08],[710,.1,.09]],
   microwave:[[1100,0,.16],[1100,.22,.16],[1100,.44,.18]],
   call:[[880,0,.19],[1319,.11,.22]],
   eat:[[236,0,.08],[302,.085,.1]],
@@ -268,7 +269,7 @@ function change(id,delta){
   hud();
 }
 function closeDialog(){
-  if(!modal)return;
+  if(!modal||modal==='paying')return;
   clearTimeout(scanTimer);
   modal=null;
   el('overlay').hidden=true;
@@ -374,6 +375,38 @@ function animateMeal(time){
   mealMotion=null;
   el('meal-motion').hidden=el('meal-status').hidden=true;
   openDialog('food');
+}
+function startPayment(){
+  const amount=total();
+  paymentMotion={amount,startedAt:performance.now(),sound:false};
+  modal='paying';
+  el('overlay').hidden=true;
+  el('meal-status').textContent=yen(amount)+' · 현금 트레이에 내려놓는 중…';
+  el('meal-status').hidden=false;
+  el('meal-motion').hidden=false;
+}
+function animatePayment(time){
+  if(!paymentMotion)return;
+  const {amount,startedAt}=paymentMotion;
+  const progress=Math.max(0,(time-startedAt)/1450);
+  if(progress>=.52&&!paymentMotion.sound){
+    paymentMotion.sound=true;
+    fx('cash');
+  }
+  if(progress<1){
+    window.drawPaymentMotion(el('meal-motion'),amount,progress);
+    return;
+  }
+  paymentMotion=null;
+  el('meal-motion').hidden=el('meal-status').hidden=true;
+  wallet-=amount;
+  receipt={items:cart.flatMap((n,id)=>n?[[id,n]]:[]),total:amount,balance:wallet,bag:null,printed:null};
+  for(const [id,quantity] of receipt.items)heldFood[id]=quantity;
+  cart.fill(0);
+  hud();
+  fx('pay');
+  updateObjective();
+  openCheckout();
 }
 function purchaseSummary(){
   return '<div class="receipt">'+receipt.items.map(([id,n])=>'<div><span>'+products[id][0]+' × '+n+'</span><span>'+yen(n*products[id][2])+'</span></div>').join('')+
@@ -493,16 +526,8 @@ el('panel-body').onclick=e=>{
     scanCount=0;
     openDialog('scan');
     scanTimer=setTimeout(scanNext,240);
-  }else if('pay' in data&&modal==='scan'&&!receipt&&scanCount===scanItems.length&&total()<=wallet){
-    const amount=total();
-    wallet-=amount;
-    receipt={items:cart.flatMap((n,id)=>n?[[id,n]]:[]),total:amount,balance:wallet,bag:null,printed:null};
-    for(const [id,amount] of receipt.items)heldFood[id]=amount;
-    cart.fill(0);
-    hud();
-    fx('pay');
-    updateObjective();
-    openCheckout();
+  }else if('pay' in data&&modal==='scan'&&!receipt&&scanItems.length&&scanCount===scanItems.length&&total()<=wallet){
+    startPayment();
   }else if(data.answer&&(modal==='bag'||modal==='receipt')){
     if(modal==='bag'){
       receipt.bag=data.answer==='yes';
@@ -908,6 +933,7 @@ function frame(time){
   const walkSignal=updateCrossing(time);
   renderScene?.(player,inside,started,microwave.endsAt>0,timeOfDay,finished,staff,guests,sleeper,time,walkSignal);
   animateMeal(time);
+  animatePayment(time);
   if(modal==='microwave'&&microwave.endsAt){
     const seconds=Math.max(0,Math.ceil((microwave.endsAt-performance.now())/1000));
     if(seconds!==microwave.shownSeconds){
@@ -921,7 +947,7 @@ function frame(time){
   const prompt=el('prompt');
   prompt.hidden=!nearby;
   const action=el('action');
-  action.disabled=!nearby&&!modal;
+  action.disabled=Boolean(paymentMotion)||(!nearby&&!modal);
   const staffId=nearby?.id;
   const verb=staffStops[staffId]&&!receipt
     ?staff.station===staffId?staffRoster[staff.profile].name+' · 오는 중':staff.at===staffId?(staffId==='hot'?'주문하기':'직원과 대화'):'직원 호출'

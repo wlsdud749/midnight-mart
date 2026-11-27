@@ -212,6 +212,11 @@ window.createStoreView = function createStoreView(canvas, stations, products) {
       return;
     }
     if(id==='register'){
+      box(x+35,y+39,24,15,48,1,'#354f59');
+      box(x+35,y+39,24,1.3,49,1.4,'#88a7ae');
+      box(x+35,y+52.7,24,1.3,49,1.4,'#88a7ae');
+      box(x+35,y+40,1.3,13,49,1.4,'#88a7ae');
+      box(x+57.7,y+40,1.3,13,49,1.4,'#88a7ae');
       box(x,y,w,h,0,43,'#527188');
       box(x-2,y-2,w+4,h+4,43,5,'#c8d7cc');
       box(x+63,y+12,24,14,48,15,'#263a46');
