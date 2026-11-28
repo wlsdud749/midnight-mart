@@ -69,7 +69,7 @@ if(location.protocol==='file:'){
   el('local-controls').hidden=false;
   entrySample=new Promise(resolve=>{
     const script=document.createElement('script');
-    script.src='../local-audio.js';
+    script.src=location.pathname.includes('/docs/')?'../local-audio.js':'local-audio.js';
     script.onload=()=>resolve(window.localEntrySample||null);
     script.onerror=()=>resolve(null);
     document.head.append(script);
@@ -86,20 +86,57 @@ function tone(f,t,d,volume,type='triangle',destination=master){
   osc.start(t);
   osc.stop(t+d+.02);
 }
+function decodeClip(id){
+  const encoded=window.staffVoiceData?.[id];
+  if(!audio||!encoded)return null;
+  if(!voices[id]){
+    voices[id]=new Promise((resolve,reject)=>{
+      const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      audio.decodeAudioData(bytes.buffer,resolve,reject);
+    }).catch(()=>null);
+  }
+  return voices[id];
+}
+function updateSoundState(){
+  const waiting=started&&!muted&&Boolean(audio)&&audio.state!=='running';
+  const label=waiting?'소리 다시 켜기':muted?'소리 켜기':'음소거';
+  const button=el('sound');
+  button.setAttribute('aria-pressed',String(muted));
+  button.setAttribute('aria-label',label);
+  button.title=label;
+  button.textContent=waiting?'♪!':muted?'♪̸':'♪';
+  el('sound-retry').hidden=!waiting;
+}
+function resumeAudio(){
+  if(!audio||muted)return;
+  audio.resume().then(updateSoundState,updateSoundState);
+}
 function initAudio(){
-  if(!audio){
+  if(!audio||audio.state==='closed'){
     const Audio=window.AudioContext || window.webkitAudioContext;
     if(!Audio)return;
+    if(navigator.audioSession){
+      try{navigator.audioSession.type='playback';}catch{}
+    }
     audio=new Audio();
+    const context=audio;
+    music=null;
+    spoken=null;
+    speechSequence++;
+    guestAudio=null;
+    pendingGuest=null;
+    crossingAudio=null;
+    crossingBuffer=null;
     master=audio.createGain();
     master.gain.value=muted?0:.72;
     master.connect(audio.destination);
-    voices=Object.fromEntries(Object.entries(window.staffVoiceData||{}).map(([id,data])=>[
-      id,audio.decodeAudioData(Uint8Array.from(atob(data),c=>c.charCodeAt(0)).buffer).catch(()=>null)
-    ]));
-    voices.crossingClip?.then(buffer=>{crossingBuffer=buffer;});
+    voices=Object.create(null);
+    audio.addEventListener('statechange',updateSoundState);
+    decodeClip('crossingClip')?.then(buffer=>{if(audio===context)crossingBuffer=buffer;});
+    if(inside)startMusic();
   }
-  audio.resume().catch(()=>{});
+  resumeAudio();
+  updateSoundState();
 }
 function startMusic(){
   if(!audio||music)return;
@@ -183,7 +220,7 @@ let muted=false;
 let spoken;
 let speechSequence=0;
 function voiceClip(key,voice){
-  return voices?.[key+voice];
+  return decodeClip(key+voice);
 }
 function say(key){
   const [jp,ko]=staffLines[key];
@@ -223,15 +260,32 @@ function say(key){
   });
 }
 el('sound').onclick=()=>{
+  if(started&&!muted&&audio?.state!=='running'){
+    retrySound();
+    return;
+  }
   muted=!muted;
-  el('sound').setAttribute('aria-pressed',String(muted));
-  el('sound').setAttribute('aria-label',muted?'소리 켜기':'음소거');
-  el('sound').title=muted?'소리 켜기':'음소거';
-  el('sound').textContent=muted?'♪̸':'♪';
   if(master)master.gain.setTargetAtTime(muted?0:.72,audio.currentTime,.015);
   if(muted){stopGuestLine();speechSequence++;if(spoken)spoken.stop();spoken=null;window.speechSynthesis?.cancel();}
   else if(started){initAudio();if(inside)startMusic();}
+  updateSoundState();
 };
+function retrySound(){
+  initAudio();
+  if(!muted)fx('click');
+}
+el('sound-retry').onclick=retrySound;
+function retryAudioOnInteraction(e){
+  if(started&&e.isTrusted&&(!audio||audio.state!=='running')&&!e.target.closest?.('#sound,#sound-retry'))initAudio();
+}
+window.addEventListener('pointerup',retryAudioOnInteraction,{passive:true});
+window.addEventListener('keydown',retryAudioOnInteraction);
+function recoverAudio(){
+  if(started&&!document.hidden&&audio?.state!=='running')resumeAudio();
+}
+document.addEventListener('visibilitychange',recoverAudio);
+window.addEventListener('pageshow',recoverAudio);
+window.addEventListener('focus',recoverAudio);
 
 const total=()=>cart.reduce((sum,n,id)=>sum+n*products[id][2],0);
 function hud(){
@@ -554,8 +608,9 @@ for(const button of timeButtons){
   };
 }
 el('start').onclick=()=>{
-  initAudio();
   started=true;
+  initAudio();
+  if(!muted&&audio?.state==='running')fx('click');
   el('intro').hidden=true;
   el('start').blur();
 };
@@ -602,6 +657,7 @@ function resetVisit(){
   el('replay').hidden=true;
   el('location').textContent='매장 앞';
   el('objective').textContent='자동문까지 앞으로 이동하세요';
+  updateSoundState();
   el('intro').hidden=false;
   el('start').focus({preventScroll:true});
 }

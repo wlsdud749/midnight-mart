@@ -40,6 +40,7 @@ main{max-width:1100px;margin:auto;padding:24px clamp(10px,3vw,30px) 12px}header{
 @media(max-width:480px){.product{width:60px;height:60px}.row,.food-row{gap:6px}}
 #meal-motion{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:min(660px,100%);height:auto;max-height:none;image-rendering:auto;pointer-events:none;z-index:3}
 #carry-motion{position:absolute;bottom:0;right:0;width:min(380px,53%);height:auto;max-height:none;image-rendering:auto;pointer-events:none}
+#sound-retry{position:absolute;top:55px;left:12px;z-index:6;padding:8px 12px;color:#10281d;background:#a1e7ba;border-color:#8ed7a8;font-weight:750}
 #meal-status,#guest-caption{position:absolute;left:50%;transform:translateX(-50%);width:max-content;max-width:94%;padding:7px 12px;background:#0a1625ec;border:1px solid #456477;border-radius:7px;text-align:center;pointer-events:none}
 #meal-status{top:16%;z-index:4}#guest-caption{bottom:14%;font-size:.84rem}
 #guest-caption small{display:block;color:var(--muted)}

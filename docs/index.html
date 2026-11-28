@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="1,000엔으로 즐기는 일본 편의점 야식 산책">
 <title>자정의 패밀리마트</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=mobile-audio-1">
 <script defer src="voices.js"></script>
 <script defer src="products.js"></script>
 <script defer src="store3d.js"></script>
 <script defer src="meal.js"></script>
-<script defer src="game.js"></script>
+<script defer src="game.js?v=mobile-audio-1"></script>
 </head>
 <body>
 <main>
@@ -30,6 +30,7 @@
     <span id="crosshair" aria-hidden="true" hidden></span>
     <div id="prompt" hidden></div>
     <div id="caption" role="status" hidden></div>
+    <button id="sound-retry" type="button" hidden>소리 다시 켜기</button>
     <div id="guest-caption" hidden></div>
     <canvas id="meal-motion" width="640" height="440" hidden aria-hidden="true"></canvas>
     <canvas id="carry-motion" width="520" height="380" hidden aria-hidden="true"></canvas>
@@ -44,7 +45,7 @@
           <button type="button" data-time-choice="night" aria-pressed="true">☾ 밤</button>
         </div>
         <button id="start" class="primary">매장 들어가기 <span aria-hidden="true">↵</span></button>
-        <small>사운드가 재생됩니다</small>
+        <small>자동문을 통과하면 매장 음악이 시작됩니다</small>
       </div>
     </div>
     <div id="overlay" hidden>
