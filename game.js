@@ -837,7 +837,36 @@ for(const b of document.querySelectorAll('[data-dir]')){
   };
   b.onpointerup=b.onpointercancel=b.onlostpointercapture=e=>touches.delete(e.pointerId);
 }
-el('action').onclick=interact;
+const touchControls=document.querySelector('.touch');
+for(const event of ['dragstart','contextmenu']){
+  touchControls.addEventListener(event,e=>e.preventDefault());
+  scene.addEventListener(event,e=>e.preventDefault());
+}
+const touchAction=el('action');
+let actionPress=null;
+touchAction.onpointerdown=e=>{
+  if(e.button!==0||actionPress)return;
+  actionPress={id:e.pointerId,x:e.clientX,y:e.clientY,dragged:false};
+  touchAction.setPointerCapture(e.pointerId);
+};
+function actionDragged(e){
+  return Math.hypot(e.clientX-actionPress.x,e.clientY-actionPress.y)>14;
+}
+touchAction.onpointermove=e=>{
+  if(actionPress?.id===e.pointerId&&actionDragged(e))actionPress.dragged=true;
+};
+touchAction.onpointerup=e=>{
+  if(actionPress?.id!==e.pointerId)return;
+  const activate=!actionPress.dragged&&!actionDragged(e);
+  actionPress=null;
+  if(activate&&!touchAction.disabled)interact();
+};
+touchAction.onpointercancel=touchAction.onlostpointercapture=e=>{
+  if(actionPress?.id===e.pointerId)actionPress=null;
+};
+touchAction.onclick=e=>{
+  if(e.detail===0)interact();
+};
 
 const map=el('minimap').getContext('2d');
 function moveGuests(dt){
